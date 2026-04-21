@@ -10970,6 +10970,31 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     # cleanly before touching any external service.
     import atexit
     from gateway.status import write_pid_file, remove_pid_file, get_running_pid
+
+    # ── Stale PID force-cleanup ──────────────────────────────────────
+    # Pre-startup defense: if a PID file exists but the process is dead,
+    # clean it up BEFORE the duplicate-instance guard runs.  This covers
+    # the edge case where the previous gateway crashed hard (SIGKILL,
+    # OOM-kill) and atexit never fired.
+    _pid_path = get_hermes_home() / "gateway.pid"
+    if _pid_path.exists():
+        try:
+            _raw = _pid_path.read_text().strip()
+            _record = json.loads(_raw) if _raw.startswith("{") else {"pid": int(_raw)}
+        except (json.JSONDecodeError, ValueError):
+            _record = None
+        if _record and "pid" in _record:
+            _old_pid = _record["pid"]
+            _alive = False
+            try:
+                os.kill(_old_pid, 0)  # signal 0 = existence check
+                _alive = True
+            except (ProcessLookupError, PermissionError):
+                pass
+            if not _alive:
+                logger.info("Stale PID file (PID %d not running) — force-cleaning.", _old_pid)
+                _pid_path.unlink(missing_ok=True)
+
     _current_pid = get_running_pid()
     if _current_pid is not None and _current_pid != os.getpid():
         logger.error(
