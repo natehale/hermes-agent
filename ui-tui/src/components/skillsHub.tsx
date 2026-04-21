@@ -1,11 +1,17 @@
-import { Box, Text, useInput } from '@hermes/ink'
+import * as Ink from '@hermes/ink'
 import { useEffect, useState } from 'react'
 
 import type { GatewayClient } from '../gatewayClient.js'
 import { rpcErrorMessage } from '../lib/rpc.js'
 import type { Theme } from '../theme.js'
 
+const { Box, Text, useInput, useStdout } = Ink as unknown as typeof Ink & {
+  useStdout: () => { stdout: NodeJS.WriteStream }
+}
+
 const VISIBLE = 12
+const MIN_WIDTH = 40
+const MAX_WIDTH = 90
 
 const pageOffset = (count: number, sel: number) => Math.max(0, Math.min(sel - Math.floor(VISIBLE / 2), count - VISIBLE))
 
@@ -25,6 +31,9 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
   const [installing, setInstalling] = useState(false)
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
+
+  const { stdout } = useStdout()
+  const width = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, (stdout?.columns ?? 80) - 6))
 
   useEffect(() => {
     gw.request<{ skills?: Record<string, string[]> }>('skills.manage', { action: 'list' })
@@ -186,7 +195,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
 
   if (err && stage === 'category') {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" width={width}>
         <Text color={t.color.label}>error: {err}</Text>
         <Text color={t.color.dim}>Esc to cancel</Text>
       </Box>
@@ -195,7 +204,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
 
   if (!cats.length) {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" width={width}>
         <Text color={t.color.dim}>no skills available</Text>
         <Text color={t.color.dim}>Esc to cancel</Text>
       </Box>
@@ -207,7 +216,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
     const { items, off } = visibleItems(rows, catIdx)
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" width={width}>
         <Text bold color={t.color.amber}>
           Skills Hub
         </Text>
@@ -224,6 +233,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
               color={catIdx === idx ? t.color.amber : t.color.dim}
               inverse={catIdx === idx}
               key={row}
+              wrap="truncate-end"
             >
               {catIdx === idx ? '▸ ' : '  '}
               {i + 1}. {row}
@@ -241,7 +251,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
     const { items, off } = visibleItems(skills, skillIdx)
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" width={width}>
         <Text bold color={t.color.amber}>
           {selectedCat}
         </Text>
@@ -259,6 +269,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
               color={skillIdx === idx ? t.color.amber : t.color.dim}
               inverse={skillIdx === idx}
               key={row}
+              wrap="truncate-end"
             >
               {skillIdx === idx ? '▸ ' : '  '}
               {i + 1}. {row}
@@ -275,7 +286,7 @@ export function SkillsHub({ gw, onClose, t }: SkillsHubProps) {
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={width}>
       <Text bold color={t.color.amber}>
         {info?.name ?? skillName}
       </Text>
